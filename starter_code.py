@@ -35,7 +35,14 @@ def lcs_recursive(seq1, seq2):
     # Hint: If last characters match, LCS length = 1 + LCS of remaining sequences
     # Hint: If last characters don't match, try removing last char from each sequence, take max
     
-    pass  # Delete this and write your code
+    def helper(i, j):
+        if i == 0 or j == 0:
+            return 0
+        if seq1[i - 1] == seq2[j - 1]:
+            return 1 + helper(i - 1, j - 1)
+        return max(helper(i - 1, j), helper(i, j - 1))
+
+    return helper(len(seq1), len(seq2))
 
 
 # ============================================================================
@@ -65,7 +72,21 @@ def lcs_memoization(seq1, seq2):
     # Hint: Check cache before computing, store result before returning
     # Hint: You may want to create a helper function that takes indices
     
-    pass  # Delete this and write your code
+    cache = {}
+
+    def helper(i, j):
+        if i == 0 or j == 0:
+            return 0
+        if (i, j) in cache:
+            return cache[(i, j)]
+        if seq1[i - 1] == seq2[j - 1]:
+            answer = 1 + helper(i - 1, j - 1)
+        else:
+            answer = max(helper(i - 1, j), helper(i, j - 1))
+        cache[(i, j)] = answer
+        return answer
+
+    return helper(len(seq1), len(seq2))
 
 
 # ============================================================================
@@ -96,7 +117,17 @@ def lcs_tabulation(seq1, seq2):
     # Hint: If characters match: dp[i][j] = dp[i-1][j-1] + 1
     # Hint: If characters don't match: dp[i][j] = max(dp[i-1][j], dp[i][j-1])
     
-    pass  # Delete this and write your code
+    m, n = len(seq1), len(seq2)
+    dp = [[0] * (n + 1) for _ in range(m + 1)]
+
+    for i in range(1, m + 1):
+        for j in range(1, n + 1):
+            if seq1[i - 1] == seq2[j - 1]:
+                dp[i][j] = dp[i - 1][j - 1] + 1
+            else:
+                dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])
+
+    return dp[m][n]
 
 
 # ============================================================================
@@ -153,32 +184,45 @@ def test_small_cases():
         print()
 
 
+def recursive_timed_with_cutoff(seq1, seq2, timeout_seconds=2.0):
+    """Measure recursive LCS in a child process, stopping runaway examples.
+
+    Returns (lcs_length, elapsed_seconds) or (None, None) on timeout.
+    The elapsed value excludes Python startup time.
+    """
+    import subprocess
+    import sys
+
+    runner = (
+        "import sys, json, time; "
+        "from starter_code import lcs_recursive; "
+        "s1, s2 = json.loads(sys.stdin.read()); "
+        "t = time.perf_counter(); "
+        "answer = lcs_recursive(s1, s2); "
+        "print(json.dumps([answer, time.perf_counter() - t]))"
+    )
+    try:
+        completed = subprocess.run(
+            [sys.executable, "-c", runner], input=json.dumps([seq1, seq2]),
+            text=True, capture_output=True, timeout=timeout_seconds, check=True,
+        )
+        return tuple(json.loads(completed.stdout))
+    except subprocess.TimeoutExpired:
+        return None, None
+
+
 def time_recursive():
-    """Time the recursive solution on progressively larger inputs."""
+    """Time naive LCS with a safe cutoff to avoid hours-long computations."""
     print("\n" + "="*70)
     print("TIMING RECURSIVE SOLUTION")
     print("="*70 + "\n")
-    print("WARNING: Recursive solution will become very slow!\n")
-    
-    sizes = [10, 20, 50]  # Keep small to avoid infinite wait
-    
-    for size in sizes:
+    for size in (10, 20, 50):
         data = load_sequence(f"dna_{size}.json")
-        seq1 = data["sequence1"]
-        seq2 = data["sequence2"]
-        
-        print(f"Sequence length: {size}")
-        
-        start = time.perf_counter()
-        result = lcs_recursive(seq1, seq2)
-        elapsed = time.perf_counter() - start
-        
-        print(f"  LCS length: {result}")
-        print(f"  Time: {elapsed:.4f} seconds\n")
-        
-        if elapsed > 5.0:
-            print("  Stopping - recursive is too slow for larger inputs!\n")
-            break
+        result, elapsed = recursive_timed_with_cutoff(data["sequence1"], data["sequence2"])
+        if elapsed is None:
+            print(f"Sequence length: {size} | TIMEOUT (>2 seconds)")
+        else:
+            print(f"Sequence length: {size} | LCS: {result} | Time: {elapsed:.4f}s")
 
 
 def compare_all_approaches():
@@ -202,9 +246,8 @@ def compare_all_approaches():
         # Recursive (skip if too large)
         if size <= 20:
             try:
-                start = time.perf_counter()
-                lcs_recursive(seq1, seq2)
-                times["recursive"] = time.perf_counter() - start
+                _, elapsed = recursive_timed_with_cutoff(seq1, seq2)
+                times["recursive"] = elapsed
             except:
                 times["recursive"] = None
         else:
@@ -240,8 +283,8 @@ if __name__ == "__main__":
     
     # Uncomment these as you complete each part:
     
-    # test_small_cases()
-    # time_recursive()
-    # compare_all_approaches()
+    test_small_cases()
+    time_recursive()
+    compare_all_approaches()
     
-    print("\n⚠ Uncomment the test functions in the main block to run tests!")
+    print("\nVerification and benchmarking complete.")
